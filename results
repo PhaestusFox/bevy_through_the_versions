@@ -1,1 +1,63 @@
-Bevy 0.8 Ring 34 with 27.6927763392919FPS
+Bevy 0.13 {
+    Spawned 58 Rings
+    Frame Took 35.09
+    FPS is 28.51
+    Rendering 41067 Entitys
+}
+
+60 FPS in static
+
+Bevy 0.13 Release {
+    Spawned 254 Rings
+    Frame Took 35.71
+    FPS is 28.02
+    Rendering 777243 Entitys
+}
+
+Bevy 0.12 {
+    Spawned 34 Rings
+    Frame Took 43.27
+    FPS is 23.11
+    Rendering 14283 Entitys
+}
+
+46.65 FPS in static
+
+Bevy 0.12 Release {
+    Spawned 134 Rings
+    Frame Took 35.41
+    FPS is 28.25
+    Rendering 217083 Entitys
+}
+
+Bevy 0.11 {
+    Spawned 30 Rings
+    Frame Took 35.28
+    FPS is 28.34
+    Rendering 11163 Entitys
+}
+
+39.59 FPS in static
+
+Bevy 0.11 Release {
+    Spawned 124 Rings
+    Frame Took 34.83
+    FPS is 28.73
+    Rendering 186003 Entitys
+}
+
+Bevy 0.10 {
+}
+
+FPS in static
+
+Bevy 0.10 Release {
+}
+
+Bevy 0.9 {
+}
+
+FPS in static
+
+Bevy 0.9 Release {
+}
