@@ -60,6 +60,9 @@ fn spawn_cam(
     mut commands: Commands,
 ) {
     commands.spawn(Camera3dBundle{
+        #[cfg(feature="static")]
+        transform: Transform::from_translation(Vec3::new(0., 15., 35.)).looking_at(Vec3::ZERO, Vec3::Y),
+        #[cfg(feature="ring")]
         transform: Transform::from_translation(Vec3::new(100., 100., 100.)).looking_at(Vec3::ZERO, Vec3::Y),
         ..Camera3dBundle::default()
     });
@@ -105,7 +108,7 @@ fn big_ring(
     mut commands: Commands,
     mut hexs: ResMut<HexMeshs>,
 ) {
-    for id in HexIdIterator::new(100) {
+    for id in HexIdIterator::new(25) {
         commands.spawn(SceneBundle {
             scene: hexs.next(),
             transform: Transform::from_translation(id.xyz(0.)),
