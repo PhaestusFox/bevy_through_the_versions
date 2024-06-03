@@ -81,7 +81,7 @@ fn spawn_ring(
     mut ring_cound: ResMut<RingCount>,
     mut hexs: ResMut<HexMeshs>,
 ) {
-    if let Some(d) = frame_time.get(&FrameTimeDiagnosticsPlugin::FPS) {
+    if let Some(d) = frame_time.get(FrameTimeDiagnosticsPlugin::FPS) {
         if let Some(d) = d.value() {
             if d < 30. {
                 return;
@@ -121,13 +121,13 @@ fn frame_time(
     frame_time: Res<DiagnosticsStore>,
     ring: Option<Res<RingCount>>
 ) {
-    if let Some(d) = frame_time.get(&FrameTimeDiagnosticsPlugin::FRAME_TIME) {
+    if let Some(d) = frame_time.get(FrameTimeDiagnosticsPlugin::FRAME_TIME) {
         println!("Frame Took {:?}", (d.average().unwrap_or_default() * 100.).round() / 100.);   
     }
-    if let Some(d) = frame_time.get(&FrameTimeDiagnosticsPlugin::FPS) {
+    if let Some(d) = frame_time.get(FrameTimeDiagnosticsPlugin::FPS) {
         println!("FPS is {:?}", (d.average().unwrap_or_default() * 100.).round() / 100.);   
     }
-    if let Some(d) = frame_time.get(&EntityCountDiagnosticsPlugin::ENTITY_COUNT) {
+    if let Some(d) = frame_time.get(EntityCountDiagnosticsPlugin::ENTITY_COUNT) {
         println!("Rendering {} Entitys", d.value().unwrap_or_default());
     }
     if let Some(ring) = ring {
