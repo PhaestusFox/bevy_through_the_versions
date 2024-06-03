@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use bevy::{diagnostic::{DiagnosticsStore, FrameTimeDiagnosticsPlugin, EntityCountDiagnosticsPlugin}, prelude::*};
 use rand::SeedableRng;
 
@@ -13,7 +15,7 @@ fn main() {
         #[cfg(feature="static")]
         app.add_systems(Startup, big_ring);
         app.add_systems(FixedUpdate, frame_time)
-        .insert_resource(Time::<Fixed>::from_hz(0.2))
+        .insert_resource(FixedTime::new(Duration::from_secs(5)))
         .init_resource::<HexMeshs>()
     .run()
 }
