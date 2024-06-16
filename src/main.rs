@@ -1,7 +1,5 @@
-use std::time::Duration;
-
 use bevy::{diagnostic::{DiagnosticsStore, FrameTimeDiagnosticsPlugin, EntityCountDiagnosticsPlugin}, prelude::*};
-use rand::SeedableRng;
+use rand::{Rng, SeedableRng};
 
 fn main() {
     let mut app = App::new();
@@ -14,8 +12,11 @@ fn main() {
         .insert_resource(RingCount(0));
         #[cfg(feature="static")]
         app.add_systems(Startup, big_ring);
+        #[cfg(feature="fly")]
+        app.add_systems(Update, fly_over);
+        app.init_resource::<FlyMap>();
         app.add_systems(FixedUpdate, frame_time)
-        .insert_resource(FixedTime::new(Duration::from_secs(5)))
+        .insert_resource(Time::<Fixed>::from_hz(0.2))
         .init_resource::<HexMeshs>()
     .run()
 }
@@ -23,6 +24,7 @@ fn main() {
 #[derive(Resource)]
 struct HexMeshs{
     rng: rand::rngs::StdRng,
+    map: noise::Fbm<noise::OpenSimplex>,
     handles: Vec<Handle<Scene>>,
 }
 
@@ -30,6 +32,53 @@ impl HexMeshs {
     fn next(&mut self) -> Handle<Scene> {
         use rand::Rng;
         self.handles[self.rng.gen_range(0..self.handles.len())].clone()
+    }
+
+    fn get(&self, cell: CellId) -> Handle<Scene> {
+        use noise::NoiseFn;
+        let hight = self.map.get([cell.q() as f64 * 2.1654, cell.r() as f64 * 2.1657]) * 10.;
+        let wet = self.map.get([cell.r() as f64 * 3.14159, cell.q() as f64 * 3.14159]) * 10.;
+        // sand 0
+        // grass 1
+        // dirt 2
+        // stone 3
+        // water 4
+        // water-rocks 5
+        // water-island 6
+        // grass-hill 7
+        // grass-forest 8
+        if hight < -0.1 {
+            if wet < -0.5 {
+                self.handles[6].clone()
+            } else if wet > 0.5 {
+                self.handles[5].clone()
+            } else {
+                self.handles[4].clone()
+            }
+        } else if hight < -0.01 {
+            self.handles[0].clone()
+        } else if hight > 0.5 {
+            if wet < -0.2 {
+                self.handles[0].clone()
+            } else if wet < 0.0 {
+                self.handles[3].clone()
+            } else if wet < 0.2 {
+                self.handles[8].clone()
+            } else {
+                self.handles[7].clone()
+            }
+        }
+        else if hight < 0.3 {
+            if wet < 0.0 {
+                self.handles[1].clone()
+            } else if wet > 0.5 {
+                self.handles[7].clone()
+            } else {
+                self.handles[8].clone()
+            }
+        } else {
+            self.handles[1].clone()
+        }
     }
 }
 
@@ -41,8 +90,14 @@ const SEED: [u8; 32] = [
 impl FromWorld for HexMeshs {
     fn from_world(world: &mut World) -> Self {
         let asset_server = world.resource::<AssetServer>();
+        let mut map = noise::Fbm::new(0x62657679);
+        map.frequency = 0.02;
+        map.octaves = 4;
+        map.lacunarity = 2.;
+        map.persistence = 0.1;
         HexMeshs {
             rng: rand::rngs::StdRng::from_seed(SEED),
+            map,
             handles: vec![
                 asset_server.load("Hexs/sand.glb#Scene0"),
                 asset_server.load("Hexs/grass.glb#Scene0"),
@@ -65,7 +120,7 @@ fn spawn_cam(
         #[cfg(feature="static")]
         transform: Transform::from_translation(Vec3::new(0., 15., 35.)).looking_at(Vec3::ZERO, Vec3::Y),
         #[cfg(feature="ring")]
-        transform: Transform::from_translation(Vec3::new(100., 100., 100.)).looking_at(Vec3::ZERO, Vec3::Y),
+        transform: Transform::from_translation(Vec3::new(0., 350., 100.)).looking_at(Vec3::ZERO, Vec3::Y),
         ..Camera3dBundle::default()
     });
     commands.spawn(DirectionalLightBundle {
@@ -77,15 +132,33 @@ fn spawn_cam(
 #[derive(Debug, Resource, DerefMut, Deref)]
 struct RingCount(i32);
 
+#[derive(Component)]
+struct Cell;
+
+
 fn spawn_ring(
+    input: Res<ButtonInput<KeyCode>>,
     frame_time: Res<DiagnosticsStore>,
     mut commands: Commands,
     mut ring_cound: ResMut<RingCount>,
     mut hexs: ResMut<HexMeshs>,
+    cells: Query<Entity, With<Cell>>,
+    mut done: Local<bool>
 ) {
-    if let Some(d) = frame_time.get(FrameTimeDiagnosticsPlugin::FPS) {
+    if input.just_pressed(KeyCode::Space) {
+        ring_cound.0 = 0;
+        for cell in cells.iter() {
+            commands.entity(cell).despawn_recursive();
+        }
+        *done = false;
+    }
+    if *done {
+        return;
+    }
+    if let Some(d) = frame_time.get(&FrameTimeDiagnosticsPlugin::FPS) {
         if let Some(d) = d.value() {
             if d < 30. {
+                *done = true;
                 return;
             }
         } else {
@@ -98,11 +171,11 @@ fn spawn_ring(
     ring_cound.0 += 1;
     for id in HexIdIterator::new(ring_cound.0) {
         if (id.distance(CellId::ZERO) as i32) < ring_cound.0 {continue;}
-        commands.spawn(SceneBundle {
-            scene: hexs.next(),
+        commands.spawn((SceneBundle {
+            scene: hexs.get(id),
             transform: Transform::from_translation(id.xyz(0.)),
             ..Default::default()
-        });
+        }, Cell));
     }
 }
 
@@ -123,13 +196,13 @@ fn frame_time(
     frame_time: Res<DiagnosticsStore>,
     ring: Option<Res<RingCount>>
 ) {
-    if let Some(d) = frame_time.get(FrameTimeDiagnosticsPlugin::FRAME_TIME) {
+    if let Some(d) = frame_time.get(&FrameTimeDiagnosticsPlugin::FRAME_TIME) {
         println!("Frame Took {:?}", (d.average().unwrap_or_default() * 100.).round() / 100.);   
     }
-    if let Some(d) = frame_time.get(FrameTimeDiagnosticsPlugin::FPS) {
+    if let Some(d) = frame_time.get(&FrameTimeDiagnosticsPlugin::FPS) {
         println!("FPS is {:?}", (d.average().unwrap_or_default() * 100.).round() / 100.);   
     }
-    if let Some(d) = frame_time.get(EntityCountDiagnosticsPlugin::ENTITY_COUNT) {
+    if let Some(d) = frame_time.get(&EntityCountDiagnosticsPlugin::ENTITY_COUNT) {
         println!("Rendering {} Entitys", d.value().unwrap_or_default());
     }
     if let Some(ring) = ring {
@@ -137,6 +210,7 @@ fn frame_time(
     }
 }
 
+#[derive(Clone, Copy)]
 struct CellId {
     q: i32,
     r: i32,
@@ -218,5 +292,39 @@ impl CellId {
             ((self.q - othor.q).abs() + (self.r - othor.r).abs() + (self.s() - othor.s()).abs())
                 / 2;
         res as u32
+    }
+}
+
+#[derive(Resource)]
+struct FlyMap(Vec<Vec3>);
+
+impl FromWorld for FlyMap {
+    fn from_world(world: &mut World) -> Self {
+        let mut path = Vec::new();
+        for _ in 0..100 {
+            let mut rng = rand::thread_rng();
+            if let Some(cell) = HexIdIterator::new(200).skip(rng.gen_range(100..100000)).next() {
+                path.push(cell.xyz(rng.gen_range(0.2f32..2.0f32)))
+            }
+        }
+        FlyMap(path)
+    }
+}
+
+const FLY_SPEED: f32 = 10.;
+
+fn fly_over(
+    mut player: Query<&mut Transform, With<Camera>>,
+    mut path: ResMut<FlyMap>,
+    time: Res<Time>
+) {
+    let Some(target) = path.0.last().cloned() else { warn!("path finished"); return;};
+    for mut player in &mut player {
+        player.look_at(target, Vec3::Y);
+        let forward = player.forward();
+        player.translation += forward * time.delta_seconds() * FLY_SPEED;
+        if player.translation.distance(target) < 1. {
+            path.0.pop();
+        }
     }
 }
